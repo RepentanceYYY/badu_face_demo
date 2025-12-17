@@ -50,6 +50,7 @@ export class faceWebSocketServer {
             if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return reject("WebSocket未连接");
 
             const handleAck = (event: any) => {
+                console.log(event);
                 if (event === "ack") {
                     console.log('客户端收到回复消息');
                     this.off("message", handleAck);

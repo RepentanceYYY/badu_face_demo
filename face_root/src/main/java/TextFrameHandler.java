@@ -11,13 +11,13 @@ import java.io.IOException;
 import java.util.Base64;
 
 public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
-
+    String path = "C:\\Users\\Administrator\\Desktop\\test_tmp";
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame frame) {
-        String json = frame.text();
-
-        JSONObject obj = JSONObject.parseObject(json);
+        String originalText = frame.text();
+        System.out.println("接收的json长度 = " + originalText.length());
+        JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
 
         if ("login".equals(type)) {
@@ -36,7 +36,7 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
                 }
 
                 // 保存图片到本地
-                File dir = new File("C:\\Users\\Alice\\Desktop\\face_test_base64");
+                File dir = new File(path);
                 if (!dir.exists()) dir.mkdirs();
                 File file = new File(dir, System.currentTimeMillis() + ".jpg");
                 ImageIO.write(img, "jpg", file);

@@ -1,5 +1,19 @@
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriter;
+import java.util.Iterator;
+
 public class FaceDemo {
     public static void main(String[] args) {
+        // 强制扫描并注册 TwelveMonkeys 插件
+        ImageIO.scanForPlugins();
+
+        // 调试：打印当前可用的 JPEG 写入器
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
+        while (writers.hasNext()) {
+            ImageWriter w = writers.next();
+            System.out.println("JPEG Writer: " + w.getClass().getName());
+            // 如果看到 com.twelvemonkeys.imageio.plugins.jpeg.JPEGImageWriter 就说明成功
+        }
         int port = 8080;
         WebSocketServer server = new WebSocketServer(port);
         // JVM 关闭时优雅停机
