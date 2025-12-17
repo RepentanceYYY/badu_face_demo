@@ -1,9 +1,19 @@
+import com.jni.face.Face;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriter;
 import java.util.Iterator;
 
-public class FaceDemo {
+public class StartFaceDemo {
     public static void main(String[] args) {
+        /*  sdk初始化 */
+        Face api = new Face();
+        String modelPath = "E:\\LZH\\Baidu_Face_Offline_SDK_Windows_Java_8.4\\face-native";
+        int res = api.sdkInit(modelPath);
+        if (res != 0) {
+            System.out.printf("sdk init fail and error =%d\n", res);
+            return;
+        }
         // 强制扫描并注册 TwelveMonkeys 插件
         ImageIO.scanForPlugins();
 

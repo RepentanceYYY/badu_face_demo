@@ -33,12 +33,16 @@ export const useFaceCapture = (
   let offscreenCanvas: HTMLCanvasElement | null = null;
   let offscreenCtx: CanvasRenderingContext2D | null = null;
 
+  let prevFaceCenter: { x: number; y: number } | null = null;
+  const headMoveThreshold = 3; // 阈值，可调，像素
+
   // 内部锁，防止 toBlob 还没完成又开始新一轮绘制
   let isProcessingBlob = false;
 
   // 加载 face-api.js 模型
   const loadModels = async () => {
     await faceapi.nets.tinyFaceDetector.loadFromUri("/face/model");
+    await faceapi.nets.faceLandmark68Net.loadFromUri("/face/model");
   };
 
   // 启动摄像头和人脸检测
@@ -117,10 +121,27 @@ export const useFaceCapture = (
     }
 
     const options = new faceapi.TinyFaceDetectorOptions();
-    const detection = await faceapi.detectSingleFace(video, options);
-
+    const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks();
+    let isHeadMoving = false;
     if (detection) {
-      captureFrame();
+      // 获取关键点：鼻子 + 左眼 + 右眼
+      const keypoints = [
+        ...detection.landmarks.getNose(),
+        ...detection.landmarks.getLeftEye(),
+        ...detection.landmarks.getRightEye(),
+      ];
+      // 计算质心
+      const avgX = keypoints.reduce((sum, p) => sum + p.x, 0) / keypoints.length;
+      const avgY = keypoints.reduce((sum, p) => sum + p.y, 0) / keypoints.length;
+      if (prevFaceCenter) {
+        const delta = Math.hypot(avgX - prevFaceCenter.x, avgY - prevFaceCenter.y);
+        isHeadMoving = delta > headMoveThreshold;
+      }
+      prevFaceCenter = { x: avgX, y: avgY };
+      console.log("头部是否在动:", isHeadMoving);
+      if (!isHeadMoving) {
+        captureFrame();
+      }
     }
 
     // 继续下一轮检测（约8-10fps检测，足够且不卡）

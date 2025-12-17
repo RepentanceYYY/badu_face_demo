@@ -49,16 +49,25 @@ export class faceWebSocketServer {
         return new Promise((resolve, reject) => {
             if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return reject("WebSocket未连接");
 
-            const handleAck = (event: any) => {
-                console.log(event);
-                if (event === "ack") {
+            const handleAck = (data: any) => {
+                let msg: any;
+                console.log(data);
+                try {
+                    msg = typeof data === "string" ? JSON.parse(data) : data;
+                } catch (err) {
+                    console.error("解析 JSON 失败", err);
+                    return;
+                }
+                if (msg.reply === "ack") {
                     console.log('客户端收到回复消息');
                     this.off("message", handleAck);
                     this.emit("ack");
                     resolve();
-                }else if(event === 'error'){
-                    this.off("message",handleAck);
+                } else if (msg.reply === 'error') {
+                    console.log('客户端收到 error');
+                    this.off("message", handleAck);
                     this.emit("error");
+                    reject("服务端 error");
                 }
             };
 

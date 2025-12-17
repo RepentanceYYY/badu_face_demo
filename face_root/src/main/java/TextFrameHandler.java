@@ -1,22 +1,17 @@
+import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
-    String path = "C:\\Users\\Administrator\\Desktop\\test_tmp";
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame frame) {
         String originalText = frame.text();
-        System.out.println("接收的json长度 = " + originalText.length());
         JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
 
@@ -25,32 +20,23 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
             ConnectionManager.add(userId, ctx.channel());
             ctx.channel().writeAndFlush(new TextWebSocketFrame("login_ack"));
         } else if ("frame".equals(type)) {
-            String base64 = obj.getString("data");
             try {
-                byte[] bytes = Base64.getDecoder().decode(base64);
-                BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
-                if (img == null) {
-                    System.err.println("收到的 base64 不是有效图片");
-                    ctx.channel().writeAndFlush(new TextWebSocketFrame("error"));
-                    return;
-                }
-
-                // 保存图片到本地
-                File dir = new File(path);
-                if (!dir.exists()) dir.mkdirs();
-                File file = new File(dir, System.currentTimeMillis() + ".jpg");
-                ImageIO.write(img, "jpg", file);
-
-                // 回复 ACK
-                ctx.channel().writeAndFlush(new TextWebSocketFrame("ack"));
-                System.out.println("保存成功：" + file.getAbsolutePath());
-
-            } catch (IllegalArgumentException | IOException e) {
+                FaceLivenessResult faceLivenessResult = FaceHandler.bestFace(obj);
+                Map<String, Object> res = new HashMap<>();
+                res.put("reply", "ack");
+                res.put("faceLivenessResult", faceLivenessResult);
+                String resultJson = JSON.toJSONString(res);
+                ctx.channel().writeAndFlush(new TextWebSocketFrame(resultJson));
+            } catch (Exception e) {
                 e.printStackTrace();
-                ctx.channel().writeAndFlush(new TextWebSocketFrame("error"));
+                Map<String, Object> res = new HashMap<>();
+                res.put("reply", "error");
+                ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(res)));
             }
         } else {
-            ctx.channel().writeAndFlush(new TextWebSocketFrame("unknown_type"));
+            Map<String, Object> res = new HashMap<>();
+            res.put("reply", "unknown_type");
+            ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(res)));
         }
     }
 
