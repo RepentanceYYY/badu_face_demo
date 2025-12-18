@@ -1,3 +1,5 @@
+package entity.reply;
+
 import lombok.Data;
 
 @Data

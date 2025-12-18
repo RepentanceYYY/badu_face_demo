@@ -34,7 +34,7 @@ export class faceWebSocketServer {
         });
     }
     /**
-     * 直接发送消息（原来的方法，不等待确认）
+     * 直接发送消息
      */
     public send(data: ArrayBuffer | ArrayBufferView | string): void {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -50,24 +50,29 @@ export class faceWebSocketServer {
             if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return reject("WebSocket未连接");
 
             const handleAck = (data: any) => {
-                let msg: any;
-                console.log(data);
+                let msg: any;                
                 try {
                     msg = typeof data === "string" ? JSON.parse(data) : data;
                 } catch (err) {
                     console.error("解析 JSON 失败", err);
                     return;
                 }
-                if (msg.reply === "ack") {
-                    console.log('客户端收到回复消息');
-                    this.off("message", handleAck);
-                    this.emit("ack");
-                    resolve();
-                } else if (msg.reply === 'error') {
-                    console.log('客户端收到 error');
-                    this.off("message", handleAck);
-                    this.emit("error");
-                    reject("服务端 error");
+                switch (msg.type) {
+                    case "login":
+                        this.off("message", handleAck);
+                        this.emit("login");
+                        resolve();
+                        break;
+
+                    case "capture":
+                        this.off("message", handleAck);
+                        this.emit("capture",msg);
+                        resolve();
+                        break;
+
+                    default:
+                        // 非 ack / error 的消息，忽略
+                        break;
                 }
             };
 

@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, ref, type Ref } from "vue";
 import * as faceapi from "face-api.js";
 
 interface FaceCaptureOptions {
@@ -14,7 +14,8 @@ type FaceCaptureSuccessCallback = (base64: string) => void;
 
 export const useFaceCapture = (
   options: FaceCaptureOptions = {},
-  onFaceCaptureSuccess?: FaceCaptureSuccessCallback
+  onFaceCaptureSuccess?: FaceCaptureSuccessCallback,
+  hintMessage?: Ref<string>
 ) => {
   const videoElement = ref<HTMLVideoElement | null>(null);
   const faceCaptureStatus = ref<
@@ -23,31 +24,26 @@ export const useFaceCapture = (
 
   const externalLock = ref(false); // 外部锁，防止并发捕获
 
+  let isProcessingBlob = false; // 内部锁，防止 toBlob 还没完成又开始新一轮绘制
+
   let stream: MediaStream | null = null;
   let detecting = false;
   let rafId: number | null = null;
-
-  const VIDEO_WIDTH = options.videoWidth || 1280;
-  const VIDEO_HEIGHT = options.videoHeight || 720;
 
   let offscreenCanvas: HTMLCanvasElement | null = null;
   let offscreenCtx: CanvasRenderingContext2D | null = null;
 
   let prevFaceCenter: { x: number; y: number } | null = null;
-  const headMoveThreshold = 3; // 阈值，可调，像素
+  const headMoveThreshold = 10; // 头部可移动像素阈值
 
-  // 内部锁，防止 toBlob 还没完成又开始新一轮绘制
-  let isProcessingBlob = false;
+
 
   // 加载 face-api.js 模型
   const loadModels = async () => {
     await faceapi.nets.tinyFaceDetector.loadFromUri("/face/model");
     await faceapi.nets.faceLandmark68Net.loadFromUri("/face/model");
   };
-
-  // 启动摄像头和人脸检测
-  const startFaceCapture = async () => {
-    faceCaptureStatus.value = "waiting";
+  const openWebcams = async () => {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -60,8 +56,16 @@ export const useFaceCapture = (
       if (videoElement.value) {
         videoElement.value.srcObject = stream;
       }
+    } catch (error) {
+      throw new Error('摄像头访问失败');
+    }
+  }
 
-      // 使用 canplaythrough 更稳，确保有足够缓冲
+  // 启动摄像头和人脸检测
+  const startFaceCapture = async () => {
+    faceCaptureStatus.value = "waiting";
+    try {
+      await openWebcams();
       await new Promise<void>((resolve) => {
         videoElement.value?.addEventListener(
           "canplaythrough",
@@ -76,9 +80,8 @@ export const useFaceCapture = (
       detecting = true;
       faceCaptureStatus.value = "detecting";
       rafId = requestAnimationFrame(detectFaceLoop);
-    } catch (err) {
-      console.error("开启摄像头失败:", err);
-      faceCaptureStatus.value = "error";
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -138,9 +141,12 @@ export const useFaceCapture = (
         isHeadMoving = delta > headMoveThreshold;
       }
       prevFaceCenter = { x: avgX, y: avgY };
-      console.log("头部是否在动:", isHeadMoving);
       if (!isHeadMoving) {
         captureFrame();
+      } else {
+        if (hintMessage) {
+          hintMessage.value = "请勿晃动";
+        }
       }
     }
 
@@ -149,8 +155,10 @@ export const useFaceCapture = (
       if (detecting) rafId = requestAnimationFrame(detectFaceLoop);
     }, 120);
   };
-
-  // 截取当前视频帧并转为 ArrayBuffer 发送
+  /**
+   * 截取当前视频帧并转为 ArrayBuffer 发送
+   * @returns base64
+   */
   const captureFrame = () => {
     const video = videoElement.value;
     if (!video) return;
@@ -167,14 +175,14 @@ export const useFaceCapture = (
       return;
     }
 
-    // 初始化离屏 canvas（只创建一次）
+    // 初始化离屏 canvas
     if (!offscreenCanvas) {
       offscreenCanvas = document.createElement("canvas");
       offscreenCanvas.width = video.videoWidth;
       offscreenCanvas.height = video.videoHeight;
       offscreenCtx = offscreenCanvas.getContext("2d", {
-        alpha: false,            // 关闭 Alpha，避免透明通道问题
-        desynchronized: false,   // 提高兼容性
+        alpha: false,
+        desynchronized: false,
         willReadFrequently: true,
       })!;
 
@@ -190,7 +198,6 @@ export const useFaceCapture = (
 
     isProcessingBlob = true;
 
-    // 使用 toDataURL 生成标准 RGB JPEG（Java ImageIO 完美兼容）
     const base64 = offscreenCanvas.toDataURL("image/jpeg", 1.0).split(',')[1];
 
     if (!base64 || base64.length < 1000) {
@@ -199,7 +206,7 @@ export const useFaceCapture = (
       return;
     }
 
-    console.log(`人脸帧捕获成功,base64大小≈: ${(base64.length * 0.75 / 1024).toFixed(1)} KB `);
+    // console.log(`人脸帧捕获成功,base64大小≈: ${(base64.length * 0.75 / 1024).toFixed(1)} KB `);
 
     if (onFaceCaptureSuccess) {
       onFaceCaptureSuccess(base64);

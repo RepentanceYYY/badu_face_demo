@@ -1,10 +1,11 @@
 import com.jni.face.Face;
+import server.WebSocketServer;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriter;
 import java.util.Iterator;
 
-public class StartFaceDemo {
+public class App {
     public static void main(String[] args) {
         /*  sdk初始化 */
         Face api = new Face();

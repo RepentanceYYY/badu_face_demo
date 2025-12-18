@@ -1,3 +1,5 @@
+package manager;
+
 import io.netty.channel.Channel;
 
 import java.util.Collection;

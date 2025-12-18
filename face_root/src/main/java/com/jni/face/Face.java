@@ -139,6 +139,7 @@ public class Face {
         /*  加载dll ,若提示加载BaiduFaceApi.dll出错，请考虑是否安装了SDK的tools文件夹的vc_redist.exe*/
         System.loadLibrary("BaiduFaceApi");
         System.loadLibrary("opencv_java320");
+        System.out.println("user.dir = " + System.getProperty("user.dir"));
     }
 
     public static void main(String[] args) {
