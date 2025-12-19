@@ -20,12 +20,12 @@
             <!-- 摄像头区域 -->
             <div class="relative bg-gray-900 rounded-lg overflow-hidden h-64 mb-4">
                 <!-- 摄像头画面 -->
-                <video v-show="shouldShowVideo" ref="videoElement" class="w-full h-full object-cover" autoplay
+                <video v-show="shouldShowVideo" ref="videoElement" class="w-full h-full object-contain" autoplay
                     playsinline></video>
 
                 <!-- 采集结果预览 -->
                 <div v-if="shouldShowPreview" class="absolute inset-0 flex items-center justify-center bg-black">
-                    <img :src="frameFinally" alt="采集的人脸照片" class="max-h-full max-w-full object-contain" />
+                    <img :src="previewImage" alt="采集的人脸照片" class="max-h-full max-w-full object-contain" />
                 </div>
 
                 <!-- 状态提示 -->
@@ -43,26 +43,12 @@
                                 {{ hintMessage }}
                             </span>
                         </template>
-                        <template v-else-if="flowStatus === 'capturing' || flowStatus === 'processing'">
-                            <span class="flex items-center">
-                                <Camera class="w-4 h-4 mr-2 text-blue-400 animate-pulse" />
-                                拍照中...
-                            </span>
-                        </template>
                         <template v-else-if="flowStatus === 'valid'">
                             <span class="flex items-center">
                                 <CheckCircle class="w-4 h-4 mr-2 text-green-400" />
                                 人脸可用
                             </span>
                         </template>
-
-                        <template v-else-if="flowStatus === 'invalid'">
-                            <span class="flex items-center">
-                                <UserX class="w-4 h-4 mr-2 text-red-400" />
-                                人脸不可用
-                            </span>
-                        </template>
-
                         <template v-else-if="flowStatus === 'error'">
                             <span class="flex items-center">
                                 <AlertTriangle class="w-4 h-4 mr-2 text-red-400 animate-pulse" />
@@ -129,14 +115,14 @@
                     </button>
                     <button v-if="showRetryButton" @click="handleRetryFaceCapture"
                         class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
-                        :disabled="flowStatus === 'processing' || isAnyBiometricCollecting">
+                        :disabled="isAnyBiometricCollecting">
                         <RefreshCw class="w-4 h-4 mr-2" />
                         重新采集
                     </button>
                 </div>
                 <button v-if="showStartButton" @click="handleStartFaceCapture"
                     class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center shadow-md"
-                    :disabled="flowStatus === 'processing' || isAnyBiometricCollecting">
+                    :disabled="isAnyBiometricCollecting">
                     <Camera class="w-4 h-4 mr-2" />
                     开始人脸采集
                 </button>
@@ -149,22 +135,18 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Camera, User, CheckCircle, UserX, AlertTriangle, Info, ChevronLeft, RefreshCw } from 'lucide-vue-next'
 import { getFaceWebSocketServer } from '@/services/faceWebSocketServer';
 import { useFaceCapture } from "@/components/useFaceCapture";
-const flowStatus = ref('waiting');
+const flowStatus = ref<'waiting' | 'starting' | 'detecting' | 'valid' | 'error'>('waiting');
 const activeTab = ref('');
-const showStartButton = ref(true);
-const showRetryButton = ref(false);
 const errorMessage = ref('');
-const previewImage = ref('');
 const showStatusOverlay = ref(true);
-const faceTopPriorityMessage = ref(false);
 const faceWebSocketServer = getFaceWebSocketServer();
 const hintMessage = ref('');
 const actionCount = ref(0);
-const allowHeadMoving = ref(false);
+const oldFaceURL = ref('');
 let frameTmp = '';
 const frameFinally = ref('');
-faceWebSocketServer.on('capture', (message: any) => {    
-    console.log('收到回复消息事件戳：'+Date.now());
+faceWebSocketServer.on('capture', (message: any) => {
+    console.log('收到回复消息时间戳：' + Date.now());
     if (message?.errorMessage) {
         hintMessage.value = message.errorMessage;
         flowStatus.value = 'error';
@@ -189,10 +171,12 @@ faceWebSocketServer.on('capture', (message: any) => {
  * 启动
  */
 const handleStartFaceCapture = async () => {
+    flowStatus.value = 'starting';
     try {
         await startFaceCapture().then(() => {
             hintMessage.value = "面向摄像头";
             flowStatus.value = 'detecting';
+            //startFaceDetectionTimeout();
         });
     } catch (error: any) {
         stopFaceCapture();
@@ -200,20 +184,21 @@ const handleStartFaceCapture = async () => {
         flowStatus.value = 'error';
     }
 }
-const handleRetryFaceCapture = () => {
-
+const handleRetryFaceCapture = async () => {
+    frameFinally.value = '';
+    await handleStartFaceCapture();
 }
 const getflowStatusClass = () => {
 
 }
 const getflowStatusText = () => {
-
+    
 }
 const handleFaceCaptureSuccessCallback = (base64: string) => {
     if (externalLock.value) return;
     externalLock.value = true;
     try {
-        console.log('发送消息事件戳:'+Date.now());
+        console.log('发送消息时间戳:' + Date.now());
         frameTmp = base64;
         const message = JSON.stringify({ type: "capture", frame: base64, userName: null, action: null });
         faceWebSocketServer.sendWithAck(message);
@@ -223,7 +208,12 @@ const handleFaceCaptureSuccessCallback = (base64: string) => {
 
     }
 }
-
+const showStartButton = computed(() => {
+    return ['waiting','error','valid'].includes(flowStatus.value) && (!oldFaceURL.value && !frameFinally.value);
+})
+const showRetryButton = computed(() => {    
+    return ['waiting','error','valid'].includes(flowStatus.value) && (oldFaceURL.value || frameFinally.value);
+})
 const isAnyBiometricCollecting = computed(() => {
     return false;
 })
@@ -233,11 +223,56 @@ const shouldShowVideo = computed(() => {
 const shouldShowPreview = computed(() => {
     return flowStatus.value === 'valid' && frameFinally.value;
 });
-const faceDetectionCountdown = ref(0);
+const previewImage = computed(() => {
+    return frameFinally.value;
+})
+const faceDetectionTimeout = ref<NodeJS.Timeout | null>(null);
+const faceDetectionInterval = ref<NodeJS.Timeout | null>(null);
+const FACE_DETECTION_TIMEOUT = 30000;
+const faceDetectionCountdown = ref(30);
+// 启动人脸检测超时计时器
+const startFaceDetectionTimeout = () => {
+    clearFaceDetectionTimeout();
+
+    faceDetectionCountdown.value = 30;
+
+    faceDetectionTimeout.value = setTimeout(() => {
+        if (flowStatus.value !== 'valid') {
+            handleFaceDetectionTimeout();
+        }
+    }, FACE_DETECTION_TIMEOUT);
+
+    faceDetectionInterval.value = setInterval(() => {
+        faceDetectionCountdown.value -= 1;
+        if (faceDetectionCountdown.value <= 0) {
+            clearFaceDetectionTimeout();
+        }
+    }, 1000);
+};
+// 清除人脸检测超时计时器
+const clearFaceDetectionTimeout = () => {
+    if (faceDetectionTimeout.value) {
+        clearTimeout(faceDetectionTimeout.value);
+        faceDetectionTimeout.value = null;
+    }
+    if (faceDetectionInterval.value) {
+        clearInterval(faceDetectionInterval.value);
+        faceDetectionInterval.value = null;
+    }
+    faceDetectionCountdown.value = 30;
+};
+// 处理人脸检测超时
+const handleFaceDetectionTimeout = () => {
+
+    stopFaceCapture();
+    flowStatus.value = 'waiting';
+    frameFinally.value = '';
+    clearFaceDetectionTimeout();
+};
 const { startFaceCapture, stopFaceCapture, externalLock, loadModels, videoElement } =
     useFaceCapture(
         { videoWidth: 640, videoHeight: 480 },
-        handleFaceCaptureSuccessCallback,hintMessage
+        handleFaceCaptureSuccessCallback, hintMessage
     );
 onMounted(async () => {
     await loadModels();

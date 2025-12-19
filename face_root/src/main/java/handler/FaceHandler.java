@@ -68,6 +68,24 @@ public class FaceHandler {
                 return availableReply;
             }
 
+            // 眼睛闭合检测
+            EyeClose[] eyeCloses = Face.faceEyeClose(rgbMatAddr);
+            if (eyeCloses == null || eyeCloses.length < 1) {
+                reply.setHintMessage("请睁开眼睛");
+                return reply;
+            }
+            if (eyeCloses[0].leftEyeCloseConf > 0.1f || eyeCloses[0].rightEyeCloseConf > 0.1f) {
+                reply.setHintMessage("请睁开眼睛");
+                return reply;
+            }
+
+            // 嘴巴闭合检测
+            float[] mouthCloseScore = Face.faceMouthClose(rgbMatAddr);
+            if (mouthCloseScore[0] < 0.9f) {
+                reply.setHintMessage("检测到张嘴");
+                return reply;
+            }
+
             // 人脸模糊度检测
             float[] blurList = Face.faceBlur(rgbMatAddr);
             if (blurList == null || blurList.length <= 0) {
@@ -79,22 +97,7 @@ public class FaceHandler {
                 reply.setHintMessage("人脸太模糊");
                 return reply;
             }
-            // 眼睛闭合检测
-            EyeClose[] eyeCloses = Face.faceEyeClose(rgbMatAddr);
-            if (eyeCloses == null || eyeCloses.length < 1) {
-                reply.setHintMessage("请睁开眼睛");
-                return reply;
-            }
-            if (eyeCloses[0].leftEyeCloseConf > 0.1f || eyeCloses[0].rightEyeCloseConf > 0.1f) {
-                reply.setHintMessage("请睁开眼睛");
-                return reply;
-            }
-            // 嘴巴闭合检测
-            float[] mouthCloseScore = Face.faceMouthClose(rgbMatAddr);
-            if (mouthCloseScore[0] < 0.9f) {
-                reply.setHintMessage("检测到张嘴");
-                return reply;
-            }
+
 
             // 如果清晰度高，并静默检测为活体，并且判断为未闭眼则保存图片
 //            if (faceLivenessResult.isSharp() && faceLivenessResult.isLive() && !faceLivenessResult.isEyeClosed() && !faceLivenessResult.isMouthOpen()) {
@@ -147,6 +150,8 @@ public class FaceHandler {
         try {
             Face.loadDbFace();
             String s = Face.identifyWithAllByMat(rgbMatAddr, 0);
+            System.out.println("可用性检测结果:");
+            System.out.println(s);
             FaceRecognitionResponse faceRecognitionResponse = JSONObject.parseObject(s, FaceRecognitionResponse.class);
             List<FaceRecognitionResult> faceRecognitionResults = faceRecognitionResponse.getData().getResult();
             if (faceRecognitionResults == null || faceRecognitionResults.size() < 1) {
