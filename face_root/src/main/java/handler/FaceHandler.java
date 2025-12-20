@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.jni.face.Face;
 import com.jni.struct.EyeClose;
 import com.jni.struct.LivenessInfo;
+import constants.SystemConstant;
 import entity.Reply;
 import entity.baidu.FaceRecognitionResponse;
 import entity.baidu.FaceRecognitionResult;
@@ -20,11 +21,13 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 public class FaceHandler {
-    static String path = "C:\\Users\\Administrator\\Desktop\\test_tmp";
+    static String FACE_PATH = "C:\\Users\\Administrator\\Desktop\\test_tmp";
 
     public static Reply capture(JSONObject obj) {
         String base64Frame = obj.getString("frame");
@@ -97,17 +100,6 @@ public class FaceHandler {
                 reply.setHintMessage("人脸太模糊");
                 return reply;
             }
-
-
-            // 如果清晰度高，并静默检测为活体，并且判断为未闭眼则保存图片
-//            if (faceLivenessResult.isSharp() && faceLivenessResult.isLive() && !faceLivenessResult.isEyeClosed() && !faceLivenessResult.isMouthOpen()) {
-//                BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
-//                File dir = new File(path);
-//                if (!dir.exists()) dir.mkdirs();
-//                File file = new File(dir, System.currentTimeMillis() + ".jpg");
-//                ImageIO.write(img, "jpg", file);
-//                System.out.println("输出照片");
-//            }
             reply.setSuccessMessage("人脸可用");
             return reply;
         } catch (Exception e) {
@@ -163,7 +155,13 @@ public class FaceHandler {
             }
             UserService userService = new UserService();
             User userByUserName = userService.getUserByUserName(best.getUserId());
-            if ((userName == null && userByUserName.getUserName() != null) || (!userName.equals(userByUserName.getUserName()))) {
+            // 如果数据没有出错，是不会返回null的
+            if (userByUserName == null) {
+                reply.setErrorMessage("人脸数据出现异常，请检查");
+                return reply;
+            }
+            if ((userName == null || userName.isEmpty()) && userByUserName.getUserName() != null
+                    || (userName != null && !userName.isEmpty() && !userName.equals(userByUserName.getUserName()))) {
                 reply.setErrorMessage("人脸已和" + userByUserName.getName() + "绑定");
                 return reply;
             }
@@ -173,5 +171,19 @@ public class FaceHandler {
             e.printStackTrace();
             return reply;
         }
+    }
+
+    public static void init() {
+        System.out.println("开始--重新生成百度人脸数据库");
+        UserService userService = new UserService();
+        Map<String, String> userIdWithFacePath = userService.getUserIdWithFacePath();
+        userIdWithFacePath.forEach((userName, facePath) -> {
+            System.out.println("用户名=" + userName + ", 人脸路径=" + facePath);
+            Mat mat = Imgcodecs.imread(facePath);
+            long matAddr = mat.getNativeObjAddr();
+            String res = Face.userAddByMat(matAddr, userName, SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP, "无信息");
+            mat.release();
+        });
+        System.out.println("结束--重新生成百度人脸数据库");
     }
 }

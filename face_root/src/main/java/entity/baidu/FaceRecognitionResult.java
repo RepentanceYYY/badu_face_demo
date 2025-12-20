@@ -11,7 +11,7 @@ public class FaceRecognitionResult {
     @JSONField(name = "group_id")
     private String groupId;
     /**
-     * 用户id
+     * 用户id，实际存放的是用户账号
      */
     @JSONField(name = "user_id")
     private String userId;

@@ -136,7 +136,6 @@ import { Camera, User, CheckCircle, UserX, AlertTriangle, Info, ChevronLeft, Ref
 import { getFaceWebSocketServer } from '@/services/faceWebSocketServer';
 import { useFaceCapture } from "@/components/useFaceCapture";
 const flowStatus = ref<'waiting' | 'starting' | 'detecting' | 'valid' | 'error'>('waiting');
-const activeTab = ref('');
 const errorMessage = ref('');
 const showStatusOverlay = ref(true);
 const faceWebSocketServer = getFaceWebSocketServer();

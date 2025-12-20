@@ -1,5 +1,6 @@
 package server;
 
+import constants.SystemConstant;
 import handler.BinaryFrameHandler;
 import handler.TextFrameHandler;
 import io.netty.channel.ChannelInitializer;
@@ -17,7 +18,7 @@ public class WebSocketServerInitializer extends ChannelInitializer<SocketChannel
         ch.pipeline().addLast(new HttpServerCodec());
         ch.pipeline().addLast(new HttpObjectAggregator(20 * 1024 * 1024));
         ch.pipeline().addLast(new WebSocketServerProtocolHandler(
-                "/ws", null, true, 15 * 1024 * 1024
+                SystemConstant.WEB_SOCKET_PATH, null, true, 15 * 1024 * 1024
         ));
         ch.pipeline().addLast(new WebSocketFrameAggregator(15 * 1024 * 1024));
         ch.pipeline().addLast(new TextFrameHandler());
