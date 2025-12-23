@@ -4,8 +4,8 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    name: 'Face',
-    component: () => import('@/views/Face.vue')
+    name: 'FaceLogin',
+    component: () => import('@/views/FaceLogin.vue')
   }
 ]
 

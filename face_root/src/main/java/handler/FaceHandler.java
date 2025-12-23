@@ -27,8 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 public class FaceHandler {
-    static String FACE_PATH = "C:\\Users\\Administrator\\Desktop\\test_tmp";
-
+    public static int baiduFaceApiCode = 0;
     public static Reply capture(JSONObject obj) {
         String base64Frame = obj.getString("frame");
         Object userNameObject = obj.get("userName");
@@ -109,6 +108,65 @@ public class FaceHandler {
             return errorReply;
         } finally {
             if (rgbMat != null) rgbMat.release();
+        }
+    }
+    public static Reply auth(JSONObject obj){
+        String base64Frame = obj.getString("frame");
+        Mat rgbMat = null;
+        Reply reply = new Reply();
+        reply.setType("auth");
+        try{
+            byte[] bytes = Base64.getDecoder().decode(base64Frame);
+            MatOfByte matOfByte = new MatOfByte(bytes);
+            rgbMat = Imgcodecs.imdecode(matOfByte, Imgcodecs.IMREAD_COLOR);
+
+            if (rgbMat.empty()) {
+                reply.setErrorMessage("消息格式错误");
+                return reply;
+            }
+
+            long rgbMatAddr = rgbMat.getNativeObjAddr();
+            // 静默活体检测
+            LivenessInfo[] liveInfos = Face.rgbLiveness(rgbMatAddr);
+            if (liveInfos == null || liveInfos.length <= 0 || liveInfos[0].box == null) {
+                reply.setHintMessage("未检测到人脸");
+                return reply;
+            }
+            float liveScore = liveInfos[0].livescore;
+            if (liveScore < 0.6f) {
+                System.out.println(String.format("检测到非活体,%.3f", liveScore));
+                reply.setHintMessage("未检测到人脸");
+                return reply;
+            }
+            Face.loadDbFace();
+            String s = Face.identifyWithAllByMat(rgbMatAddr, 0);
+            System.out.println(s);
+            FaceRecognitionResponse faceRecognitionResponse = JSONObject.parseObject(s, FaceRecognitionResponse.class);
+            List<FaceRecognitionResult> faceRecognitionResults = faceRecognitionResponse.getData().getResult();
+            if (faceRecognitionResults == null || faceRecognitionResults.size() < 1) {
+                reply.setErrorMessage("登录失败，人脸不存在");
+                return reply;
+            }
+            FaceRecognitionResult best = faceRecognitionResults.get(0);
+            if (best.getScore() < 80) {
+                reply.setErrorMessage("登录失败，人脸不存在");
+                return reply;
+            }
+            UserService userService = new UserService();
+            User userByUserName = userService.getUserByUserName(best.getUserId());
+            if (userByUserName == null) {
+                reply.setErrorMessage("人脸数据出现异常，请检查");
+                return reply;
+            }
+            reply.setSuccessMessage("登录成功");
+            reply.setData(userByUserName);
+            return reply;
+
+        }catch (Exception e){
+            reply.setErrorMessage(e.getMessage());
+            return reply;
+        }finally {
+            rgbMat.release();
         }
     }
 

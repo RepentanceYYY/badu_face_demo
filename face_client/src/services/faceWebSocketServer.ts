@@ -58,9 +58,9 @@ export class faceWebSocketServer {
                     return;
                 }
                 switch (msg.type) {
-                    case "login":
+                    case "auth":
                         this.off("message", handleAck);
-                        this.emit("login");
+                        this.emit("auth");
                         resolve();
                         break;
 

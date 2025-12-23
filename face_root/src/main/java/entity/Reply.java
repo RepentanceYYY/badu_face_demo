@@ -24,4 +24,8 @@ public class Reply {
      * 帧
      */
     private String frame;
+    /**
+     * 数据
+     */
+    private Object data;
 }

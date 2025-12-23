@@ -19,13 +19,17 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
         String originalText = frame.text();
         JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
+        if(FaceHandler.baiduFaceApiCode != 0){
+            Reply commReply = new Reply();
+            commReply.setType(type);
+            commReply.setErrorMessage("人脸模型初始化失败，状态码为"+FaceHandler.baiduFaceApiCode);
+        }
         switch (type) {
 
-            case "login": {
-                String userId = obj.getString("userId");
-                ConnectionManager.add(userId, ctx.channel());
+            case "auth": {
+                Reply auth = FaceHandler.auth(obj);
                 ctx.channel().writeAndFlush(
-                        new TextWebSocketFrame("login_ack")
+                        new TextWebSocketFrame(JSON.toJSONString(auth))
                 );
                 break;
             }
