@@ -23,6 +23,10 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
             Reply commReply = new Reply();
             commReply.setType(type);
             commReply.setErrorMessage("人脸模型初始化失败，状态码为"+FaceHandler.baiduFaceApiCode);
+            ctx.channel().writeAndFlush(
+                    new TextWebSocketFrame(JSON.toJSONString(commReply))
+            );
+            return;
         }
         switch (type) {
 
