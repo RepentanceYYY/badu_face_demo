@@ -1,5 +1,6 @@
 package handler;
 
+import com.jni.face.Face;
 import entity.Reply;
 import entity.baidu.FaceRecognitionResponse;
 import com.alibaba.fastjson2.JSON;
@@ -19,10 +20,10 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
         String originalText = frame.text();
         JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
-        if(FaceHandler.baiduFaceApiCode != 0){
+        if (FaceHandler.baiduFaceApiCode != 0) {
             Reply commReply = new Reply();
             commReply.setType(type);
-            commReply.setErrorMessage("人脸模型初始化失败，状态码为"+FaceHandler.baiduFaceApiCode);
+            commReply.setErrorMessage("人脸模型初始化失败，状态码为" + FaceHandler.baiduFaceApiCode);
             ctx.channel().writeAndFlush(
                     new TextWebSocketFrame(JSON.toJSONString(commReply))
             );
@@ -43,6 +44,12 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
                 ctx.channel().writeAndFlush(
                         new TextWebSocketFrame(JSON.toJSONString(reply))
                 );
+                break;
+            }
+
+            case "update": {
+                Reply reply = FaceHandler.update(obj);
+                ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(reply)));
                 break;
             }
 

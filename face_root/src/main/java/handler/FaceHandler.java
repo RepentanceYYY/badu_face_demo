@@ -3,6 +3,7 @@ package handler;
 import com.alibaba.fastjson2.JSONObject;
 import com.jni.face.Face;
 import com.jni.struct.EyeClose;
+import com.jni.struct.HeadPose;
 import com.jni.struct.LivenessInfo;
 import constants.SystemConstant;
 import entity.Reply;
@@ -28,6 +29,12 @@ import java.util.Map;
 
 public class FaceHandler {
     public static int baiduFaceApiCode = 0;
+
+    /**
+     * 人脸采集
+     * @param obj
+     * @return
+     */
     public static Reply capture(JSONObject obj) {
         String base64Frame = obj.getString("frame");
         Object userNameObject = obj.get("userName");
@@ -35,10 +42,10 @@ public class FaceHandler {
         if (userNameObject != null) {
             userName = userNameObject.toString();
         }
+        Object actionObject = obj.get("action");
         Mat rgbMat = null;
         Reply reply = new Reply();
         reply.setType("capture");
-        FaceLivenessResult faceLivenessResult = new FaceLivenessResult();
         try {
             byte[] bytes = Base64.getDecoder().decode(base64Frame);
             MatOfByte matOfByte = new MatOfByte(bytes);
@@ -64,10 +71,21 @@ public class FaceHandler {
             }
             // 既然检测到了是活体，代表检测到了人脸
 
-            // 人脸可用性检测
+            // 人脸可用性检测(判断是否和其他人脸做绑定了什么的)
             Reply availableReply = availableDetection(rgbMatAddr, userName, "capture");
             if (availableReply != null) {
                 return availableReply;
+            }
+            // 获取到嘴巴闭合参数
+            float[] mouthCloseScore = Face.faceMouthClose(rgbMatAddr);
+            // 如果有动作要求，先返回动作要求的结果
+            if (actionObject != null) {
+                return actionDetection(reply.getType(), mouthCloseScore, actionObject.toString(), rgbMatAddr);
+            }
+            // 嘴巴闭合检测
+            if (mouthCloseScore[0] < 0.9f) {
+                reply.setHintMessage("请闭合嘴巴");
+                return reply;
             }
 
             // 眼睛闭合检测
@@ -81,20 +99,14 @@ public class FaceHandler {
                 return reply;
             }
 
-            // 嘴巴闭合检测
-            float[] mouthCloseScore = Face.faceMouthClose(rgbMatAddr);
-            if (mouthCloseScore[0] < 0.9f) {
-                reply.setHintMessage("检测到张嘴");
-                return reply;
-            }
-
             // 人脸模糊度检测
             float[] blurList = Face.faceBlur(rgbMatAddr);
             if (blurList == null || blurList.length <= 0) {
                 reply.setHintMessage("检测不到人脸");
                 return reply;
             }
-            if (blurList[0] > 0.02f) {
+            System.out.println("当前模糊度:"+blurList[0]);
+            if (blurList[0] > 0.2f) {
                 System.out.println(String.format("模糊度太高，%.3f", blurList[0]));
                 reply.setHintMessage("人脸太模糊");
                 return reply;
@@ -110,12 +122,19 @@ public class FaceHandler {
             if (rgbMat != null) rgbMat.release();
         }
     }
-    public static Reply auth(JSONObject obj){
+
+    /**
+     * 人脸认证
+     * @param obj
+     * @return
+     */
+    public static Reply auth(JSONObject obj) {
         String base64Frame = obj.getString("frame");
+        Object actionObject = obj.get("action");
         Mat rgbMat = null;
         Reply reply = new Reply();
         reply.setType("auth");
-        try{
+        try {
             byte[] bytes = Base64.getDecoder().decode(base64Frame);
             MatOfByte matOfByte = new MatOfByte(bytes);
             rgbMat = Imgcodecs.imdecode(matOfByte, Imgcodecs.IMREAD_COLOR);
@@ -138,6 +157,13 @@ public class FaceHandler {
                 reply.setHintMessage("未检测到人脸");
                 return reply;
             }
+            // 如果当前是动作检测
+            if (actionObject != null) {
+                // 获取到嘴巴闭合参数
+                float[] mouthCloseScore = Face.faceMouthClose(rgbMatAddr);
+                return actionDetection(reply.getType(), mouthCloseScore, actionObject.toString(), rgbMatAddr);
+            }
+
             Face.loadDbFace();
             String s = Face.identifyWithAllByMat(rgbMatAddr, 0);
             System.out.println(s);
@@ -162,12 +188,57 @@ public class FaceHandler {
             reply.setData(userByUserName);
             return reply;
 
-        }catch (Exception e){
+        } catch (Exception e) {
             reply.setErrorMessage(e.getMessage());
+            return reply;
+        } finally {
+            rgbMat.release();
+        }
+    }
+
+    /**
+     * 人脸注册和更新
+     * @param obj
+     * @return
+     */
+    public static Reply update(JSONObject obj) {
+        Reply reply = new Reply();
+        String base64Frame = obj.getString("frame");
+        Object userNameObject = obj.get("userName");
+        String userName;
+        if (userNameObject == null) {
+            reply.setErrorMessage("未提供用户账号");
+            return reply;
+        }
+        userName = userNameObject.toString();
+        Mat rgbMat = null;
+        reply.setType("update");
+        try{
+            byte[] bytes = Base64.getDecoder().decode(base64Frame);
+            MatOfByte matOfByte = new MatOfByte(bytes);
+            rgbMat = Imgcodecs.imdecode(matOfByte, Imgcodecs.IMREAD_COLOR);
+            if (rgbMat.empty()) {
+                reply.setErrorMessage("未提供图片base64");
+                return reply;
+            }
+            long rgbMatAddr = rgbMat.getNativeObjAddr();
+            // 静默活体检测
+            LivenessInfo[] liveInfos = Face.rgbLiveness(rgbMatAddr);
+            if (liveInfos == null || liveInfos.length <= 0 || liveInfos[0].box == null) {
+                reply.setHintMessage("未检测到人脸");
+                return reply;
+            }
+            String addResult = Face.userAddByMat(rgbMatAddr,userName,SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP,"notInfo");
+            String updateResult = Face.userUpdate(rgbMatAddr, userName, SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP, "notInfo");
+            reply.setSuccessMessage("更新成功");
+        }catch (Exception e){
+            reply.setErrorMessage("更新失败");
             return reply;
         }finally {
             rgbMat.release();
         }
+
+        return reply;
     }
 
     public static FaceRecognitionResponse faceRecognition(JSONObject obj) {
@@ -231,8 +302,66 @@ public class FaceHandler {
         }
     }
 
+    /**
+     * 动作检测
+     *
+     * @param type
+     * @param mouthCloseScore
+     * @param action
+     * @param rgbMatAddr
+     * @return
+     */
+    public static Reply actionDetection(String type, float[] mouthCloseScore, String action, long rgbMatAddr) {
+        Reply reply = new Reply();
+        reply.setType(type);
+        HeadPose[] headPoses = Face.faceHeadPose(rgbMatAddr);
+        if (headPoses == null || headPoses.length <= 0) {
+            reply.setHintMessage("检测不到人脸");
+            return reply;
+        }
+        if (action.equals("turn_left")) {
+            if (headPoses[0].yaw > 20F) {
+                reply.setHintMessage("动作完成");
+                reply.setActionCompleted(true);
+                return reply;
+            } else {
+                reply.setHintMessage("请左转头");
+                reply.setActionCompleted(false);
+                return reply;
+            }
+        }
+        if (action.equals("turn_right")) {
+            if (headPoses[0].yaw < -20F) {
+                reply.setHintMessage("动作完成");
+                reply.setActionCompleted(true);
+                return reply;
+            } else {
+                reply.setHintMessage("请右转头");
+                reply.setActionCompleted(false);
+                return reply;
+            }
+        }
+        if (action.equals("open_mouth")) {
+            if (mouthCloseScore[0] < 0.6f) {
+                reply.setHintMessage("动作完成");
+                reply.setActionCompleted(true);
+                return reply;
+            } else {
+                reply.setHintMessage("请张嘴");
+                reply.setActionCompleted(false);
+                return reply;
+            }
+        }
+        reply.setErrorMessage("动作检测异常");
+        return reply;
+    }
+
+    /**
+     * 初始化百度人脸数据库
+     */
     public static void init() {
         System.out.println("开始--重新生成百度人脸数据库");
+        long startTime = System.currentTimeMillis();
         UserService userService = new UserService();
         Map<String, String> userIdWithFacePath = userService.getUserIdWithFacePath();
         userIdWithFacePath.forEach((userName, facePath) -> {
@@ -242,6 +371,10 @@ public class FaceHandler {
             String res = Face.userAddByMat(matAddr, userName, SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP, "无信息");
             mat.release();
         });
-        System.out.println("结束--重新生成百度人脸数据库");
+        long endTime = System.currentTimeMillis(); // 结束计时
+        long duration = endTime - startTime;
+        System.out.println("结束--重新生成百度人脸数据库，耗时：" + duration + " 毫秒");
     }
+
+
 }

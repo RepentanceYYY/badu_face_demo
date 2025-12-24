@@ -28,4 +28,8 @@ public class Reply {
      * 数据
      */
     private Object data;
+    /**
+     * 动作完成
+     */
+    private Boolean actionCompleted;
 }
