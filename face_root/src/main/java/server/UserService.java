@@ -1,6 +1,6 @@
 package server;
 
-import constants.SystemConstant;
+import config.SystemConfig;
 import entity.db.User;
 
 import java.sql.*;
@@ -10,9 +10,11 @@ import java.util.List;
 import java.util.Map;
 
 public class UserService {
+    private SystemConfig systemConfig;
 
     public UserService() {
         try {
+            systemConfig = SystemConfig.getInstance();
             Class.forName("com.mysql.cj.jdbc.Driver");
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -25,7 +27,7 @@ public class UserService {
             return null;
         }
         String sql = "SELECT * FROM user WHERE userName = ?";
-        try (Connection conn = DriverManager.getConnection(SystemConstant.DB_URL, SystemConstant.DB_USERNAME, SystemConstant.DB_PASSWORD);
+        try (Connection conn = DriverManager.getConnection(systemConfig.getDbUrl(), systemConfig.getDbUsername(), systemConfig.getDbPassword());
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, userName);
@@ -59,7 +61,7 @@ public class UserService {
         List<User> users = new ArrayList<>();
         String sql = "SELECT * FROM user";
 
-        try (Connection conn = DriverManager.getConnection(SystemConstant.DB_URL, SystemConstant.DB_USERNAME, SystemConstant.DB_PASSWORD);
+        try (Connection conn = DriverManager.getConnection(systemConfig.getDbUrl(), systemConfig.getDbUsername(), systemConfig.getDbPassword());
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -92,7 +94,7 @@ public class UserService {
     // 保存用户
     public boolean saveUser(User user) {
         String sql = "INSERT INTO user(name, userName, gender, createdAt, active, role, cardInfo, fingerPrintInfo, faceInfo, passWord, srttings, openId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(SystemConstant.DB_URL, SystemConstant.DB_USERNAME, SystemConstant.DB_PASSWORD);
+        try (Connection conn = DriverManager.getConnection(systemConfig.getDbUrl(), systemConfig.getDbUsername(), systemConfig.getDbPassword());
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, user.getName());
@@ -133,7 +135,7 @@ public class UserService {
         Map<String, String> map = new HashMap<>();
         String sql = "SELECT userName, faceInfo FROM user";
 
-        try (Connection conn = DriverManager.getConnection(SystemConstant.DB_URL, SystemConstant.DB_USERNAME, SystemConstant.DB_PASSWORD);
+        try (Connection conn = DriverManager.getConnection(systemConfig.getDbUrl(), systemConfig.getDbUsername(), systemConfig.getDbPassword());
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
@@ -149,7 +151,7 @@ public class UserService {
                 // 提取文件名（带后缀）
                 String fileName = faceInfo.substring(faceInfo.lastIndexOf("/") + 1);
                 // 拼接完整路径
-                String fullPath = SystemConstant.FACE_IMAGE_PATH + "\\" + fileName;
+                String fullPath = systemConfig.getFaceImagePath() + "\\" + fileName;
                 map.put(userName, fullPath);
             }
 

@@ -1,6 +1,6 @@
 package server;
 
-import constants.SystemConstant;
+import config.SystemConfig;
 import handler.BinaryFrameHandler;
 import handler.TextFrameHandler;
 import io.netty.channel.ChannelInitializer;
@@ -14,11 +14,12 @@ public class WebSocketServerInitializer extends ChannelInitializer<SocketChannel
 
     @Override
     protected void initChannel(SocketChannel ch) {
+        SystemConfig systemConfig = SystemConfig.getInstance();
 
         ch.pipeline().addLast(new HttpServerCodec());
         ch.pipeline().addLast(new HttpObjectAggregator(20 * 1024 * 1024));
         ch.pipeline().addLast(new WebSocketServerProtocolHandler(
-                SystemConstant.WEB_SOCKET_PATH, null, true, 15 * 1024 * 1024
+                systemConfig.getWebSocketPath(), null, true, 15 * 1024 * 1024
         ));
         ch.pipeline().addLast(new WebSocketFrameAggregator(15 * 1024 * 1024));
         ch.pipeline().addLast(new TextFrameHandler());

@@ -5,33 +5,30 @@ import com.jni.face.Face;
 import com.jni.struct.EyeClose;
 import com.jni.struct.HeadPose;
 import com.jni.struct.LivenessInfo;
-import constants.SystemConstant;
+import config.SystemConfig;
 import entity.Reply;
 import entity.baidu.FaceRecognitionResponse;
 import entity.baidu.FaceRecognitionResult;
 import entity.db.User;
-import entity.reply.FaceLivenessResult;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
 import org.opencv.imgcodecs.Imgcodecs;
-import org.springframework.util.StringUtils;
 import server.UserService;
+import utils.FileUtils;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 public class FaceHandler {
     public static int baiduFaceApiCode = 0;
+    private static SystemConfig systemConfig = SystemConfig.getInstance();
 
     /**
      * 人脸采集
+     *
      * @param obj
      * @return
      */
@@ -105,7 +102,7 @@ public class FaceHandler {
                 reply.setHintMessage("检测不到人脸");
                 return reply;
             }
-            System.out.println("当前模糊度:"+blurList[0]);
+            System.out.println("当前模糊度:" + blurList[0]);
             if (blurList[0] > 0.2f) {
                 System.out.println(String.format("模糊度太高，%.3f", blurList[0]));
                 reply.setHintMessage("人脸太模糊");
@@ -125,6 +122,7 @@ public class FaceHandler {
 
     /**
      * 人脸认证
+     *
      * @param obj
      * @return
      */
@@ -170,12 +168,12 @@ public class FaceHandler {
             FaceRecognitionResponse faceRecognitionResponse = JSONObject.parseObject(s, FaceRecognitionResponse.class);
             List<FaceRecognitionResult> faceRecognitionResults = faceRecognitionResponse.getData().getResult();
             if (faceRecognitionResults == null || faceRecognitionResults.size() < 1) {
-                reply.setErrorMessage("登录失败，人脸不存在");
+                reply.setErrorMessage("人脸不存在");
                 return reply;
             }
             FaceRecognitionResult best = faceRecognitionResults.get(0);
             if (best.getScore() < 80) {
-                reply.setErrorMessage("登录失败，人脸不存在");
+                reply.setErrorMessage("人脸不存在");
                 return reply;
             }
             UserService userService = new UserService();
@@ -198,6 +196,7 @@ public class FaceHandler {
 
     /**
      * 人脸注册和更新
+     *
      * @param obj
      * @return
      */
@@ -213,7 +212,7 @@ public class FaceHandler {
         userName = userNameObject.toString();
         Mat rgbMat = null;
         reply.setType("update");
-        try{
+        try {
             byte[] bytes = Base64.getDecoder().decode(base64Frame);
             MatOfByte matOfByte = new MatOfByte(bytes);
             rgbMat = Imgcodecs.imdecode(matOfByte, Imgcodecs.IMREAD_COLOR);
@@ -228,13 +227,13 @@ public class FaceHandler {
                 reply.setHintMessage("未检测到人脸");
                 return reply;
             }
-            String addResult = Face.userAddByMat(rgbMatAddr,userName,SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP,"notInfo");
-            String updateResult = Face.userUpdate(rgbMatAddr, userName, SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP, "notInfo");
+            String addResult = Face.userAddByMat(rgbMatAddr, userName, systemConfig.getBaiduFaceDbDefaultGroup(), "notInfo");
+            String updateResult = Face.userUpdate(rgbMatAddr, userName, systemConfig.getBaiduFaceDbDefaultGroup(), "notInfo");
             reply.setSuccessMessage("更新成功");
-        }catch (Exception e){
+        } catch (Exception e) {
             reply.setErrorMessage("更新失败");
             return reply;
-        }finally {
+        } finally {
             rgbMat.release();
         }
 
@@ -360,7 +359,7 @@ public class FaceHandler {
      * 初始化百度人脸数据库
      */
     public static void init() {
-        System.out.println("开始--重新生成百度人脸数据库");
+        System.out.println("开始--> 重新生成百度人脸数据库");
         long startTime = System.currentTimeMillis();
         UserService userService = new UserService();
         Map<String, String> userIdWithFacePath = userService.getUserIdWithFacePath();
@@ -368,12 +367,12 @@ public class FaceHandler {
             System.out.println("用户名=" + userName + ", 人脸路径=" + facePath);
             Mat mat = Imgcodecs.imread(facePath);
             long matAddr = mat.getNativeObjAddr();
-            String res = Face.userAddByMat(matAddr, userName, SystemConstant.BAIDU_FACE_DB_DEFAULT_GROUP, "无信息");
+            String res = Face.userAddByMat(matAddr, userName, systemConfig.getBaiduFaceDbDefaultGroup(), "无信息");
             mat.release();
         });
         long endTime = System.currentTimeMillis(); // 结束计时
         long duration = endTime - startTime;
-        System.out.println("结束--重新生成百度人脸数据库，耗时：" + duration + " 毫秒");
+        System.out.println("结束--> 重新生成百度人脸数据库，耗时：" + duration + " 毫秒");
     }
 
 

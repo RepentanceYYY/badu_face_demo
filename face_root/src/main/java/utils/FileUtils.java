@@ -1,16 +1,12 @@
 package utils;
 
-import constants.SystemConstant;
-
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 
 public class FileUtils {
 
-    public static void deleteOldBaiduFaceDb() {
-        Path dir = Paths.get(System.getProperty("java.home"),"bin", "db");
-        System.out.println("百度人脸数据库所在目录"+ dir);
+    public static void deleteDirectory(Path dir) {
         if (Files.exists(dir)) {
             try {
                 deleteDirectoryRecursively(dir);
@@ -22,7 +18,6 @@ public class FileUtils {
         } else {
             System.out.println("目录不存在，无需删除：" + dir.toAbsolutePath());
         }
-        System.out.println("百度人脸旧数据库已删除");
     }
 
     private static void deleteDirectoryRecursively(Path path) throws IOException {

@@ -9,6 +9,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import manager.ConnectionManager;
+import manager.FaceApiManager;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,17 +21,16 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
         String originalText = frame.text();
         JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
-        if (FaceHandler.baiduFaceApiCode != 0) {
+        if (FaceApiManager.sdkInitCode != 0) {
             Reply commReply = new Reply();
             commReply.setType(type);
-            commReply.setErrorMessage("人脸模型初始化失败，状态码为" + FaceHandler.baiduFaceApiCode);
+            commReply.setErrorMessage("百度人脸使用失败，错误消息:" + FaceApiManager.getErrorText(FaceApiManager.sdkInitCode));
             ctx.channel().writeAndFlush(
                     new TextWebSocketFrame(JSON.toJSONString(commReply))
             );
             return;
         }
         switch (type) {
-
             case "auth": {
                 Reply auth = FaceHandler.auth(obj);
                 ctx.channel().writeAndFlush(
