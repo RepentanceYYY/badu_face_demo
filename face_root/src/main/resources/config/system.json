@@ -3,7 +3,7 @@
   "baiduFaceModelPath": "C:\\Users\\Administrator\\Desktop\\rfid_baidu_face\\face-native",
   "baiduFaceDbDefaultGroup": "group",
   "dbUrl": "jdbc:mysql://localhost:3306/rfidcabinet?useSSL=false&serverTimezone=UTC",
-  "faceImagePath": "E:\\LZH\\rfid_cabinet_summary\\rfid_cabinet_client\\project-root\\static\\face\\faces",
+  "faceImagePath": "E:\\LZH\\rfid_cabinet_summary\\rfid_cabinet_node\\project-root\\static\\face\\faces",
   "dbUsername": "root",
   "dbPassword": "123456",
   "webSocketPath": "/ws"

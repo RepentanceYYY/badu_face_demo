@@ -21,6 +21,14 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
         String originalText = frame.text();
         JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
+
+        if (type.equals("activation")) {
+            Reply reply = FaceApiManager.activateSDK(obj);
+            ctx.channel().writeAndFlush(
+                    new TextWebSocketFrame(JSON.toJSONString(reply))
+            );
+            return;
+        }
         if (FaceApiManager.sdkInitCode != 0) {
             Reply commReply = new Reply();
             commReply.setType(type);
@@ -94,13 +102,11 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         System.out.println("客户端连接：" + ctx.channel().id());
-        // 可以暂时不用存，等客户端发送登录信息
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         System.out.println("客户端断开：" + ctx.channel().id());
-        // 如果你存的是 userId → Channel，需要找到对应的 userId 并删除
         ConnectionManager.all().forEach(ch -> {
             if (ch == ctx.channel()) {
                 ConnectionManager.remove(ch.id().asLongText());

@@ -150,9 +150,9 @@ public class FaceHandler {
                 return reply;
             }
             float liveScore = liveInfos[0].livescore;
+            System.out.println(String.format("活体置信度为:%.3f", liveScore));
             if (liveScore < 0.6f) {
-                System.out.println(String.format("检测到非活体,%.3f", liveScore));
-                reply.setHintMessage("未检测到人脸");
+                reply.setHintMessage("人脸检测中");
                 return reply;
             }
             // 如果当前是动作检测
@@ -164,7 +164,6 @@ public class FaceHandler {
 
             Face.loadDbFace();
             String s = Face.identifyWithAllByMat(rgbMatAddr, 0);
-            System.out.println(s);
             FaceRecognitionResponse faceRecognitionResponse = JSONObject.parseObject(s, FaceRecognitionResponse.class);
             List<FaceRecognitionResult> faceRecognitionResults = faceRecognitionResponse.getData().getResult();
             if (faceRecognitionResults == null || faceRecognitionResults.size() < 1) {
@@ -269,10 +268,8 @@ public class FaceHandler {
         reply.setType(type);
         try {
             Face.loadDbFace();
-            String s = Face.identifyWithAllByMat(rgbMatAddr, 0);
-            System.out.println("可用性检测结果:");
-            System.out.println(s);
-            FaceRecognitionResponse faceRecognitionResponse = JSONObject.parseObject(s, FaceRecognitionResponse.class);
+            String identifyResultJson = Face.identifyWithAllByMat(rgbMatAddr, 0);
+            FaceRecognitionResponse faceRecognitionResponse = JSONObject.parseObject(identifyResultJson, FaceRecognitionResponse.class);
             List<FaceRecognitionResult> faceRecognitionResults = faceRecognitionResponse.getData().getResult();
             if (faceRecognitionResults == null || faceRecognitionResults.size() < 1) {
                 return null;
