@@ -7,9 +7,7 @@ import entity.Reply;
 import handler.FaceHandler;
 import utils.FileUtils;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -68,12 +66,13 @@ public class FaceApiManager {
         SystemConfig systemConfig = SystemConfig.getInstance();
         File licenseFile = new File(systemConfig.getBaiduFaceModelPath(), "license/license.key");
         if (!licenseFile.exists()) {
-            reply.setErrorMessage("找不到证书路径，无法激活");
+            reply.setErrorMessage("找不到证书路径，无法授权");
             return reply;
         }
         Object activationCodeObject = obj.get("activationCode");
-        if (activationCodeObject == null) {
-            reply.setErrorMessage("激活码不能为空");
+        if (activationCodeObject == null || activationCodeObject.toString().trim().length() == 0) {
+            reply.setCode(400);
+            reply.setErrorMessage("授权码不能为空");
             return reply;
         }
         String activationCode = activationCodeObject.toString().trim();
@@ -83,7 +82,8 @@ public class FaceApiManager {
             writer.write(activationCode);
             writer.flush();
         } catch (IOException e) {
-            reply.setErrorMessage("激活码写入失败,程序消息:"+e.getMessage());
+            reply.setCode(500);
+            reply.setErrorMessage("激活码写入失败,程序消息:" + e.getMessage());
             return reply;
         } finally {
             if (writer != null) {
@@ -96,15 +96,45 @@ public class FaceApiManager {
         }
         api = new Face();
         sdkInitCode = api.sdkInit(systemConfig.getBaiduFaceModelPath());
-        if(sdkInitCode != 0){
+        if (sdkInitCode != 0) {
             destroy();
-            reply.setErrorMessage("激活失败，SDK回复:"+getErrorText(sdkInitCode));
+            reply.setCode(500);
+            reply.setErrorMessage(getErrorText(sdkInitCode));
             return reply;
         }
         FaceHandler.init();
         Face.loadDbFace();
-        reply.setSuccessMessage("百度人脸激活成功");
+        reply.setCode(200);
+        reply.setSuccessMessage("百度人脸授权成功");
         return reply;
+    }
+
+    /**
+     * 查询授权码
+     * @return 授权码
+     */
+    public static String queryActivationCode() {
+        SystemConfig systemConfig = SystemConfig.getInstance();
+        File licenseFile = new File(systemConfig.getBaiduFaceModelPath(), "license/license.key");
+
+        if (!licenseFile.exists()) {
+            return null;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(licenseFile))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+
+            String activationCode = sb.toString().trim();
+
+            return activationCode.isEmpty() ? null : activationCode;
+
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -115,46 +145,46 @@ public class FaceApiManager {
     }
 
     static {
-        codeTextMap.put(0, "SUCCESS /成功");
-        codeTextMap.put(-1, "ILLEGAL_PARAMS / 失败或非法参数");
-        codeTextMap.put(-2, "MEMORY_ALLOCATION_FAILED / 内存分配失败");
-        codeTextMap.put(-3, "INSTANCE_IS_EMPTY / 实例对象为空");
-        codeTextMap.put(-4, "MODEL_IS_EMPTY / 模型内容为空");
-        codeTextMap.put(-5, "UNSUPPORT_ABILITY_TYPE / 不支持的能力类型");
-        codeTextMap.put(-6, "UNSUPPORT_INFER_TYPE / 不支持的预测库类型");
-        codeTextMap.put(-7, "NN_CREATE_FAILED / 预测库对象创建失败");
-        codeTextMap.put(-8, "NN_INIT_FAILED / 预测库对象初始化失败");
-        codeTextMap.put(-9, "IMAGE_IS_EMPTY / 图像数据为空");
-        codeTextMap.put(-10, "ABILITY_INIT_FAILED / 人脸能力初始化失败");
-        codeTextMap.put(-11, "ABILITY_UNLOAD / 人脸能力未加载");
-        codeTextMap.put(-12, "ABILITY_ALREADY_LOADED / 人脸能力已加载");
-        codeTextMap.put(-13, "NOT_AUTHORIZED / 未授权");
-        codeTextMap.put(-14, "ABILITY_RUN_EXCEPTION / 人脸能力运行异常");
-        codeTextMap.put(-15, "UNSUPPORT_IMAGE_TYPE / 不支持的图像类型");
-        codeTextMap.put(-16, "IMAGE_TRANSFORM_FAILED / 图像转换失败");
-        codeTextMap.put(-1001, "SYSTEM_ERROR / 系统错误");
-        codeTextMap.put(-1002, "PARARM_ERROR / 参数错误");
-        codeTextMap.put(-1003, "DB_OP_FAILED / 数据库操作失败");
-        codeTextMap.put(-1004, "NO_DATA / 没有数据");
-        codeTextMap.put(-1005, "RECORD_UNEXIST / 记录不存在");
-        codeTextMap.put(-1006, "RECORD_ALREADY_EXIST / 记录已经存在");
-        codeTextMap.put(-1007, "FILE_NOT_EXIST / 文件不存在");
-        codeTextMap.put(-1008, "GET_FEATURE_FAIL / 提取特征值失败");
-        codeTextMap.put(-1009, "FILE_TOO_BIG / 文件太大");
-        codeTextMap.put(-1010, "FACE_RESOURCE_NOT_EXIST / 人脸资源文件不存在");
-        codeTextMap.put(-1011, "FEATURE_LEN_ERROR / 特征值长度错误");
-        codeTextMap.put(-1012, "DETECT_NO_FACE / 未检测到人脸");
-        codeTextMap.put(-1013, "CAMERA_ERROR / 摄像头错误或不存在");
-        codeTextMap.put(-1014, "FACE_INSTANCE_ERROR / 人脸引擎初始化错误");
-        codeTextMap.put(-1015, "LICENSE_FILE_NOT_EXIST / 授权文件不存在");
-        codeTextMap.put(-1016, "LICENSE_KEY_EMPTY / 授权序列号为空");
-        codeTextMap.put(-1017, "LICENSE_KEY_INVALID / 授权序列号无效");
-        codeTextMap.put(-1018, "LICENSE_KEY_EXPIRE / 授权序列号过期");
-        codeTextMap.put(-1019, "LICENSE_ALREADY_USED / 授权序列号已被使用");
-        codeTextMap.put(-1020, "DEVICE_ID_EMPTY / 设备指纹为空");
-        codeTextMap.put(-1021, "NETWORK_TIMEOUT / 网络超时");
-        codeTextMap.put(-1022, "NETWORK_ERROR / 网络错误");
-        codeTextMap.put(-1023, "CONF_INI_UNEXIST / 配置ini文件不存在");
-        codeTextMap.put(-1024, "WINDOWS_SERVER_ERROR / 禁用在Windows Server");
+        codeTextMap.put(0, "成功");
+        codeTextMap.put(-1, "失败或非法参数");
+        codeTextMap.put(-2, "内存分配失败");
+        codeTextMap.put(-3, "实例对象为空");
+        codeTextMap.put(-4, "百度模型内容为空");
+        codeTextMap.put(-5, "百度不支持的能力类型");
+        codeTextMap.put(-6, "百度不支持的预测库类型");
+        codeTextMap.put(-7, "预测库对象创建失败");
+        codeTextMap.put(-8, "预测库对象初始化失败");
+        codeTextMap.put(-9, "图像数据为空");
+        codeTextMap.put(-10, "百度人脸能力初始化失败");
+        codeTextMap.put(-11, "百度人脸能力未加载");
+        codeTextMap.put(-12, "百度人脸能力已加载");
+        codeTextMap.put(-13, "百度人脸未授权");
+        codeTextMap.put(-14, "人脸能力运行异常");
+        codeTextMap.put(-15, "不支持的图像类型");
+        codeTextMap.put(-16, "图像转换失败");
+        codeTextMap.put(-1001, "系统错误");
+        codeTextMap.put(-1002, "参数错误");
+        codeTextMap.put(-1003, "数据库操作失败");
+        codeTextMap.put(-1004, "没有数据");
+        codeTextMap.put(-1005, "记录不存在");
+        codeTextMap.put(-1006, "记录已经存在");
+        codeTextMap.put(-1007, "文件不存在");
+        codeTextMap.put(-1008, "提取特征值失败");
+        codeTextMap.put(-1009, "文件太大");
+        codeTextMap.put(-1010, "人脸资源文件不存在");
+        codeTextMap.put(-1011, "特征值长度错误");
+        codeTextMap.put(-1012, "未检测到人脸");
+        codeTextMap.put(-1013, "摄像头错误或不存在");
+        codeTextMap.put(-1014, "人脸引擎初始化错误");
+        codeTextMap.put(-1015, "百度人脸授权文件不存在,请重新授权");
+        codeTextMap.put(-1016, "百度人脸授权序列号为空,请重新授权");
+        codeTextMap.put(-1017, "百度人脸授权序列号无效,请重新授权");
+        codeTextMap.put(-1018, "百度人脸授权序列号过期,请重新授权");
+        codeTextMap.put(-1019, "百度人脸授权序列号已被使用,请重新授权");
+        codeTextMap.put(-1020, "百度人脸设备指纹为空");
+        codeTextMap.put(-1021, "网络超时");
+        codeTextMap.put(-1022, "网络错误");
+        codeTextMap.put(-1023, "百度人脸配置ini文件不存在");
+        codeTextMap.put(-1024, "百度人脸禁用在Windows Server");
     }
 }

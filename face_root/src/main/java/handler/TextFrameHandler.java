@@ -21,18 +21,47 @@ public class TextFrameHandler extends SimpleChannelInboundHandler<TextWebSocketF
         String originalText = frame.text();
         JSONObject obj = JSONObject.parseObject(originalText);
         String type = obj.getString("type");
-
+        /**
+         * 激活百度人脸sdk
+         */
         if (type.equals("activation")) {
             Reply reply = FaceApiManager.activateSDK(obj);
+            reply.setType("activation");
             ctx.channel().writeAndFlush(
                     new TextWebSocketFrame(JSON.toJSONString(reply))
             );
             return;
         }
+        /**
+         * 获取激活状态
+         */
+        if (type.equals("activationStatus")) {
+            Reply reply = new Reply();
+            reply.setType("activationStatus");
+            Map<Object, Object> dataMap = new HashMap<>();
+            if (FaceApiManager.sdkInitCode <= 1015 && FaceApiManager.sdkInitCode >= -1019) {
+                dataMap.put("needActivation", true);
+                dataMap.put("activationCode", FaceApiManager.queryActivationCode());
+            }
+            dataMap.put("sdkInitCode", FaceApiManager.sdkInitCode);
+            reply.setData(dataMap);
+            if (FaceApiManager.sdkInitCode != 0) {
+                reply.setErrorMessage(FaceApiManager.getErrorText(FaceApiManager.sdkInitCode));
+            } else {
+                reply.setSuccessMessage("百度人脸SDK已激活");
+            }
+            ctx.channel().writeAndFlush(
+                    new TextWebSocketFrame(JSON.toJSONString(reply))
+            );
+            return;
+        }
+        /**
+         * 下面的所有动作都需要百度人脸已经激活
+         */
         if (FaceApiManager.sdkInitCode != 0) {
             Reply commReply = new Reply();
             commReply.setType(type);
-            commReply.setErrorMessage("百度人脸使用失败，错误消息:" + FaceApiManager.getErrorText(FaceApiManager.sdkInitCode));
+            commReply.setErrorMessage(FaceApiManager.getErrorText(FaceApiManager.sdkInitCode));
             ctx.channel().writeAndFlush(
                     new TextWebSocketFrame(JSON.toJSONString(commReply))
             );

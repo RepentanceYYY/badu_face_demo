@@ -32,4 +32,8 @@ public class Reply {
      * 动作完成
      */
     private Boolean actionCompleted;
+    /**
+     * 响应码
+     */
+    private int code;
 }
